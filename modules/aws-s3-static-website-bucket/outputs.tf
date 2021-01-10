@@ -10,7 +10,7 @@ output "name" {
   value       = aws_s3_bucket.s3_app_bucket.id
 }
 
-output "website_endpoint" {
-  description = "Domain name of the bucket"
-  value       = aws_s3_bucket.s3_app_bucket.website_endpoint
+output "bucket_regional_domain_name" {
+  description = "Regional domain name of the bucket"
+  value       = aws_s3_bucket.s3_app_bucket.bucket_regional_domain_name
 }

@@ -41,7 +41,7 @@ module "template_files" {
 }
 
 # Upload content of the www folder
-resource "aws_s3_bucket_object" "www_content" {
+resource "aws_s3_bucket_object" "content" {
   for_each = module.template_files.files
   bucket = aws_s3_bucket.s3_app_bucket.id
   key = each.key

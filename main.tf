@@ -71,6 +71,54 @@ module "data-aws-acm-certificate" {
   domain = var.domain
 }
 
+# AWS WAF IP set
+resource "aws_waf_ipset" "ip_allowlist" {
+  count = length(var.allowlist_ip) > 0 ? 1 : 0
+
+  name = "${var.domain}-ip-whitelist"
+  dynamic "ip_set_descriptors" {
+    for_each = var.allowlist_ip
+    content {
+      type  = "IPV4"
+      value = ip_set_descriptors.value
+    }
+  }
+}
+
+# AWS WAF rule
+resource "aws_waf_rule" "ip_allowlist" {
+  count = length(var.allowlist_ip) > 0 ? 1 : 0
+
+  name        = "${var.domain}-ip-whitelist"
+  metric_name = "WafRule${sha256(var.domain)}"
+  predicates {
+    type    = "IPMatch"
+    data_id = aws_waf_ipset.ip_allowlist.0.id
+    negated = false
+  }
+}
+
+# AWS WAF Web ACL
+resource "aws_waf_web_acl" "ip_allowlist" {
+  count = length(var.allowlist_ip) > 0 ? 1 : 0
+
+  name        = "${var.domain}-ip-whitelist-acl"
+  metric_name = "ACL${sha256(var.domain)}"
+
+  rules {
+    rule_id = aws_waf_rule.ip_allowlist.0.id
+    action {
+      type = "ALLOW"
+    }
+    priority = 1
+    type     = "REGULAR"
+  }
+
+  default_action {
+    type = "BLOCK"
+  }
+}
+
 # Cloudfront distribution
 resource "aws_cloudfront_distribution" "app_distribution" {
   # App bucket origin
@@ -136,7 +184,7 @@ resource "aws_cloudfront_distribution" "app_distribution" {
   restrictions {
     geo_restriction {
       restriction_type = "whitelist"
-      locations = ["DE"]
+      locations = ["DE", "NL"]
     }
   }
 
@@ -144,6 +192,8 @@ resource "aws_cloudfront_distribution" "app_distribution" {
     acm_certificate_arn = module.data-aws-acm-certificate.arn
     ssl_support_method = "sni-only"
   }
+
+  web_acl_id = length(var.allowlist_ip) > 0 ? aws_waf_web_acl.ip_allowlist.0.id : null
 
   depends_on = [module.website_s3_bucket, module.data-aws-acm-certificate, aws_s3_bucket.s3_static]
 }

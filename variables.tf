@@ -5,3 +5,8 @@ variable "domain" {
   type        = string
 }
 
+variable "allowlist_ip" {
+  description = "IPv4 CIDR ranges allowed to access the distribution"
+  type        = list(string)
+  default     = []
+}

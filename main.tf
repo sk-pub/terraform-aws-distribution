@@ -9,6 +9,7 @@ locals {
   app_bucket_origin_id = "app_bucket"
 }
 
+# S3 bucket for the app
 module "website_s3_bucket" {
   source = "./modules/aws-s3-static-website-bucket"
   bucket_name = local.app_bucket_name
@@ -16,6 +17,28 @@ module "website_s3_bucket" {
     Terraform   = "true"
     Environment = "dev"
   }
+}
+
+# CF distribution identity
+resource "aws_cloudfront_origin_access_identity" "app_distribution" {
+}
+
+# S3 access policy document
+data "aws_iam_policy_document" "app_distribution" {
+  statement {
+    actions = ["s3:GetObject"]
+    principals {
+      type        = "AWS"
+      identifiers = [aws_cloudfront_origin_access_identity.app_distribution.iam_arn]
+    }
+    resources = ["${module.website_s3_bucket.arn}/*"]
+  }
+}
+
+# S3 access policy
+resource "aws_s3_bucket_policy" "app_distribution" {
+  bucket = module.website_s3_bucket.name
+  policy = data.aws_iam_policy_document.app_distribution.json
 }
 
 # Get the ACM certificate data by the domain
@@ -29,6 +52,9 @@ resource "aws_cloudfront_distribution" "app_distribution" {
   origin {
     domain_name = module.website_s3_bucket.bucket_regional_domain_name
     origin_id   = local.app_bucket_origin_id
+    s3_origin_config {
+      origin_access_identity = aws_cloudfront_origin_access_identity.app_distribution.cloudfront_access_identity_path
+    }
   }
 
   enabled = true
